@@ -1,278 +1,118 @@
 <!doctype html>
 <html>
-<head>
-<meta charset="utf-8">
-<title>MCQ DOCX Generator (Images + Table)</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-
-<style>
-body{font-family: Arial; margin:14px}
-.wrap{display:flex; gap:12px; flex-wrap:wrap}
-.col{flex:1; min-width:330px; border:1px solid #ccc; padding:12px; border-radius:6px}
-input, textarea, select { width:100%; padding:8px; margin:6px 0; box-sizing:border-box;}
-button{padding:10px 14px; margin-right:8px; background:#0b7a3e; color:#fff; border:0; border-radius:6px; cursor:pointer}
-.preview-table{width:100%; border:2px solid #444; border-collapse:collapse; margin-bottom:18px}
-.preview-table td{border:1px solid #666; padding:6px; vertical-align:top}
-.left{background:#fff; font-weight:600; width:120px}
-.right{background:#ffe39c}
-</style>
-</head>
 <body>
-
-<h2>MCQ → DOCX (Image + Table Format)</h2>
-
-<div class="wrap">
-<div class="col">
-
-<label>Module</label> <input id="module">
-
-<label>Question Text</label> <textarea id="question"></textarea>
-<label>Question Image</label> <input type="file" id="qimg">
-
-<label>Option A</label> <input id="optA">
-<label>Image A</label> <input type="file" id="imgA">
-
-<label>Option B</label> <input id="optB">
-<label>Image B</label> <input type="file" id="imgB">
-
-<label>Option C</label> <input id="optC">
-<label>Image C</label> <input type="file" id="imgC">
-
-<label>Option D</label> <input id="optD">
-<label>Image D</label> <input type="file" id="imgD">
-
-<label>Answer</label> <input id="answer">
-
-<label>Solution</label> <textarea id="solution"></textarea>
-<label>Solution Image</label> <input type="file" id="imgSol">
-
-<label>Positive Marks</label> <input id="pm" value="1">
-<label>Negative Marks</label> <input id="nm" value="0.6">
-
-<div style="margin-top:15px">
-<button id="addBtn">Add Question</button>
-<button style="background:#666" id="clearBtn">Clear</button>
-</div>
-
-<hr>
-
-<button style="background:#0066cc" id="exportBtn">Export DOCX</button>
-
-</div>
-
-<div class="col">
-<h3>Preview</h3>
-<div id="previewArea">No questions added.</div>
-</div>
-</div>
+<button onclick="downloadDocx()">Download DOCX</button>
 
 <script>
-let questions = [];
-let qno = 1;
+function downloadDocx(){
 
-/* Read file → base64 */
-function fileToBase64(file){
-  return new Promise(res=>{
-    if(!file) return res(null);
-    const r = new FileReader();
-    r.onload = ()=> res(r.result);
-    r.readAsDataURL(file);
-  });
-}
+  const documentXml = `
+  <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+  <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+      <w:p>
+        <w:r><w:t>Hello Aadi, DOCX working!</w:t></w:r>
+      </w:p>
+    </w:body>
+  </w:document>`;
 
-/* Add Question */
-document.getElementById("addBtn").onclick = async ()=>{
-  const qi = await fileToBase64(qimg.files[0]);
-  const ai = await fileToBase64(imgA.files[0]);
-  const bi = await fileToBase64(imgB.files[0]);
-  const ci = await fileToBase64(imgC.files[0]);
-  const di = await fileToBase64(imgD.files[0]);
-  const si = await fileToBase64(imgSol.files[0]);
+  const contentTypes = `
+  <?xml version="1.0" encoding="UTF-8"?>
+  <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+    <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+    <Default Extension="xml" ContentType="application/xml"/>
+    <Override PartName="/word/document.xml" 
+      ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  </Types>`;
 
-  let obj = {
-    questionno: qno++,
-    module: module.value,
-    question: question.value,
-    qimg: qi,
-    option: [optA.value, optB.value, optC.value, optD.value],
-    optimg: [ai, bi, ci, di],
-    answer: answer.value,
-    solution: solution.value,
-    simg: si,
-    pm: pm.value,
-    nm: nm.value
+  const rels = `
+  <?xml version="1.0"?>
+  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  </Relationships>`;
+
+  const docrels = `
+  <?xml version="1.0"?>
+  <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  </Relationships>`;
+
+  const files = {
+    "[Content_Types].xml": contentTypes,
+    "_rels/.rels": rels,
+    "word/_rels/document.xml.rels": docrels,
+    "word/document.xml": documentXml
   };
 
-  questions.push(obj);
-  render();
-};
-
-function imgHtml(b64){
-  if(!b64) return "";
-  return `<div><img src="${b64}" style="max-width:150px"></div>`;
+  const zip = makeZip(files);
+  const blob = new Blob([zip], {type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "test.docx";
+  a.click();
 }
 
-/* Preview */
-function render(){
-  let out="";
-  questions.forEach(q=>{
-    out += `<table class='preview-table'>
-      <tr><td class='left'>Module</td><td class='right'>${q.module}</td></tr>
-      <tr><td class='left'>questionno</td><td class='right'>${q.questionno}</td></tr>
-      <tr><td class='left'>Question</td><td class='right'>${q.question}${imgHtml(q.qimg)}</td></tr>
-      <tr><td class='left'>Type</td><td class='right'>mcq</td></tr>
-      <tr><td class='left'>option</td><td class='right'>${q.option[0]}${imgHtml(q.optimg[0])}</td></tr>
-      <tr><td class='left'>option</td><td class='right'>${q.option[1]}${imgHtml(q.optimg[1])}</td></tr>
-      <tr><td class='left'>option</td><td class='right'>${q.option[2]}${imgHtml(q.optimg[2])}</td></tr>
-      <tr><td class='left'>option</td><td class='right'>${q.option[3]}${imgHtml(q.optimg[3])}</td></tr>
-      <tr><td class='left'>answer</td><td class='right'>${q.answer}</td></tr>
-      <tr><td class='left'>Solution</td><td class='right'>${q.solution}${imgHtml(q.simg)}</td></tr>
-      <tr><td class='left'>Positive Marks</td><td class='right'>${q.pm}</td></tr>
-      <tr><td class='left'>Negative Marks</td><td class='right'>${q.nm}</td></tr>
-    </table>`;
-  });
-
-  previewArea.innerHTML = out || "No questions added.";
-}
-
-/* ---------- DOCX GENERATION (simplified safe version) ---------- */
-/* For safety: only text table export (image add manually later) */
-
-function xmlEscape(s){
-  if(!s) return "";
-  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
-
-function buildTable(q){
-  function row(l, r){
-    return `<w:tr>
-      <w:tc><w:tcPr><w:shd w:fill="FFFFFF"/></w:tcPr>
-        <w:p><w:r><w:t>${xmlEscape(l)}</w:t></w:r></w:p></w:tc>
-      <w:tc><w:tcPr><w:shd w:fill="FFE39C"/></w:tcPr>
-        <w:p><w:r><w:t>${xmlEscape(r)}</w:t></w:r></w:p></w:tc>
-    </w:tr>`;
-  }
-
-  let t = "";
-  t += row("Module", q.module);
-  t += row("questionno", q.questionno);
-  t += row("Question", q.question);
-  t += row("Type","mcq");
-
-  for(let i=0;i<4;i++){
-    t += row("option", q.option[i] || "");
-  }
-  t += row("answer", q.answer);
-  t += row("Solution", q.solution);
-  t += row("Positive Marks", q.pm);
-  t += row("Negative Marks", q.nm);
-
-  return `<w:tbl>
-    <w:tblPr><w:tblBorders>
-      <w:top w:val="single" w:sz="12"/>
-      <w:left w:val="single" w:sz="12"/>
-      <w:right w:val="single" w:sz="12"/>
-      <w:bottom w:val="single" w:sz="12"/>
-      <w:insideH w:val="single" w:sz="8"/>
-      <w:insideV w:val="single" w:sz="8"/>
-    </w:tblBorders></w:tblPr>
-    ${t}
-  </w:tbl>
-  <w:p><w:r><w:t></w:t></w:r></w:p>`;
-}
-
-function buildDoc(){
-  let body="";
-  questions.forEach(q=> body += buildTable(q));
-
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-  <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-  <w:body>${body}</w:body></w:document>`;
-}
-
-/* ZIP maker */
 function makeZip(files){
-  function str2buf(s){return new TextEncoder().encode(s);}
-  function u32(n){return [n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255];}
+  function str2buf(s){ return new TextEncoder().encode(s); }
+  function u32(n){ return [n&255,(n>>8)&255,(n>>16)&255,(n>>24)&255]; }
+
   let out=[], cen=[], offset=0;
 
-  for(let name in files){
-    let data=str2buf(files[name]);
-    let fn=str2buf(name);
-    let header=new Uint8Array(30+fn.length);
+  for(const name in files){
+    const data=str2buf(files[name]);
+    const fn=str2buf(name);
 
-    header.set([80,75,3,4],0);
-    header.set([20,0],4);
-    header.set([0,0],6);
-    header.set([0,0],8);
-    header.set([0,0,0,0],10);
-    header.set([0,0,0,0],14);
-    header.set(u32(data.length),18);
-    header.set(u32(data.length),22);
-    header.set([fn.length,0],26);
-    header.set(fn,30);
+    const lh=new Uint8Array(30+fn.length);
+    lh.set([80,75,3,4],0);
+    lh.set([20,0],4);
+    lh.set([0,0],6);
+    lh.set([0,0],8);
+    lh.set([0,0,0,0],10);
+    lh.set(u32(0),14);
+    lh.set(u32(data.length),18);
+    lh.set(u32(data.length),22);
+    lh.set([fn.length,0],26);
+    lh.set(fn,30);
 
-    out.push(header, data);
+    out.push(lh,data);
 
-    let cenH=new Uint8Array(46+fn.length);
-    cenH.set([80,75,1,2],0);
-    cenH.set([20,0],4);
-    cenH.set(u32(0),12);
-    cenH.set(u32(data.length),20);
-    cenH.set(u32(data.length),24);
-    cenH.set([fn.length,0],28);
-    cenH.set(u32(offset),42);
-    cenH.set(fn,46);
+    const ch=new Uint8Array(46+fn.length);
+    ch.set([80,75,1,2],0);
+    ch.set([20,0],4);
+    ch.set([20,0],6);
+    ch.set([0,0],8);
+    ch.set([0,0,0,0],12);
+    ch.set(u32(0),16);
+    ch.set(u32(data.length),20);
+    ch.set(u32(data.length),24);
+    ch.set([fn.length,0],28);
+    ch.set([0,0],32);
+    ch.set([0,0],36);
+    ch.set(u32(offset),42);
+    ch.set(fn,46);
 
-    cen.push(cenH);
-    offset += header.length + data.length;
+    cen.push(ch);
+
+    offset += lh.length + data.length;
   }
 
   let cenStart = offset;
-  cen.forEach(c=> out.push(c), offset+=c.length);
-  let cenSize = offset - cenStart;
+  cen.forEach(c=>{ out.push(c); offset+=c.length; });
 
-  let end=new Uint8Array(22);
+  const end=new Uint8Array(22);
   end.set([80,75,5,6],0);
-  end.set([cen.length,0],10);
   end.set([cen.length,0],8);
-  end.set(u32(cenSize),12);
+  end.set([cen.length,0],10);
+  end.set(u32(offset-cenStart),12);
   end.set(u32(cenStart),16);
 
   out.push(end);
 
   let size = out.reduce((a,b)=>a+b.length,0);
-  let buf=new Uint8Array(size), p=0;
-  out.forEach(b=>{buf.set(b,p);p+=b.length;});
+  let buf=new Uint8Array(size);
+  let p=0;
+  out.forEach(b=>{ buf.set(b,p); p+=b.length; });
+
   return buf;
 }
-
-document.getElementById("exportBtn").onclick=()=>{
-  let docXml=buildDoc();
-  let files={
-    "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8"?>
-      <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-      <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-      <Default Extension="xml" ContentType="application/xml"/>
-      <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-      </Types>`,
-
-    "_rels/.rels": `<?xml version="1.0"?>
-      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`,
-
-    "word/_rels/document.xml.rels": `<?xml version="1.0"?>
-      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>`,
-
-    "word/document.xml": docXml
-  };
-
-  let zip=makeZip(files);
-  let blob=new Blob([zip],{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
-  let a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="questions.docx";
-  a.click();
-};
 </script>
 </body>
 </html>
