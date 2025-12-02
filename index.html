@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>MCQ → DOCX (Final All-in-One)</title>
+<title>MCQ → question.docx (Images embedded, Kruti Dev, AutoSave)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
   body{font-family:Arial; margin:14px; color:#111}
@@ -17,31 +17,36 @@
   .muted{color:#666; font-size:13px}
   .preview-table{width:100%; border-collapse:collapse; margin-bottom:8px}
   .preview-table td{border:1px solid #888; padding:6px; vertical-align:top}
-  .controls{display:flex; gap:8px; flex-wrap:wrap}
-  .small{font-size:13px; padding:6px 8px}
   #jsonArea{height:120px; font-family:monospace}
+  .file-input{font-size:13px; margin:4px 0;}
+  .img-preview{max-width:120px; max-height:80px; display:block; margin-top:6px; border:1px solid #ccc}
 </style>
 </head>
 <body>
-<h2>MCQ → DOCX (Final)</h2>
-<p class="muted">Auto-detect Hindi → Kruti Dev, JSON paste import, Auto-save, Export DOCX (Word compatible).</p>
+<h2>MCQ → question.docx (Images embedded)</h2>
+<p class="muted">Images allowed in Module/Question/Options/Solution — Auto-detect Hindi → Kruti Dev; Export → question.docx</p>
 
 <div class="wrap">
-  <div class="col" style="max-width:520px">
+  <div class="col" style="max-width:560px">
     <label>Module</label>
     <input id="module" placeholder="Module (ex: Hindi)">
+    <label>Module Image (optional)</label>
+    <input type="file" accept="image/*" id="moduleImg" class="file-input">
 
     <label>Question</label>
     <textarea id="question" rows="3" placeholder="Question statement"></textarea>
+    <label>Question Image (optional)</label>
+    <input type="file" accept="image/*" id="questionImg" class="file-input">
 
-    <label>Option A</label><input id="optA" placeholder="Option A">
-    <label>Option B</label><input id="optB" placeholder="Option B">
-    <label>Option C</label><input id="optC" placeholder="Option C">
-    <label>Option D</label><input id="optD" placeholder="Option D">
+    <label>Option A</label><input id="optA"><input type="file" accept="image/*" id="optAImg" class="file-input">
+    <label>Option B</label><input id="optB"><input type="file" accept="image/*" id="optBImg" class="file-input">
+    <label>Option C</label><input id="optC"><input type="file" accept="image/*" id="optCImg" class="file-input">
+    <label>Option D</label><input id="optD"><input type="file" accept="image/*" id="optDImg" class="file-input">
 
     <label>Answer</label><input id="answer" placeholder="A/B/C/D">
-
-    <label>Solution</label><textarea id="solution" rows="2" placeholder="Solution/explanation"></textarea>
+    <label>Solution</label><textarea id="solution" rows="2"></textarea>
+    <label>Solution Image (optional)</label>
+    <input type="file" accept="image/*" id="solutionImg" class="file-input">
 
     <div style="display:flex; gap:8px">
       <div style="flex:1">
@@ -59,27 +64,26 @@
       <option value="en">en (force English)</option>
     </select>
 
-    <div class="controls" style="margin-top:8px">
+    <div style="margin-top:8px">
       <button id="addBtn" class="btn-green">Add Question</button>
-      <button id="clearBtn" class="small" style="background:#999;color:#fff">Clear Fields</button>
-      <button id="saveJSONBtn" class="small" style="background:#444;color:#fff">Export JSON</button>
+      <button id="clearBtn" style="background:#999;color:#fff">Clear Fields</button>
+      <button id="saveJSONBtn" style="background:#444;color:#fff">Export JSON</button>
     </div>
 
     <hr>
 
-    <label>JSON Import / Paste (paste valid JSON array of questions)</label>
-    <textarea id="jsonArea" placeholder='Example: [{"module":"Hindi","question":"...","option":["a","b","c","d"],"answer":"A","solution":"...","pm":"1","nm":"0.6","language":"hi"}]'></textarea>
-    <div class="controls">
-      <button id="importJsonBtn" class="small btn-blue">Import JSON (paste & click)</button>
-      <button id="clearJsonBtn" class="small" style="background:#777;color:#fff">Clear JSON</button>
+    <label>JSON Import / Paste</label>
+    <textarea id="jsonArea" placeholder='Paste JSON array here (images as dataURL optional)'></textarea>
+    <div style="margin-top:8px">
+      <button id="importJsonBtn" class="btn-blue">Import JSON</button>
+      <button id="clearJsonBtn" style="background:#777;color:#fff">Clear JSON</button>
     </div>
 
     <hr>
-    <div class="controls">
-      <button id="exportBtn" class="btn-blue">Export DOCX</button>
+    <div style="display:flex; gap:8px">
+      <button id="exportBtn" class="btn-blue">Export question.docx</button>
       <button id="downloadJsonBtn" class="small">Download JSON File</button>
     </div>
-
   </div>
 
   <div class="col">
@@ -90,192 +94,277 @@
       <button id="removeLast" class="btn-red">Remove Last</button>
       <button id="resetAll" style="background:#7f8c8d;color:#fff">Clear All</button>
     </div>
-    <p class="muted" style="margin-top:12px">Auto-save enabled — आप page refresh कर सकते हैं, data सुरक्षित रहेगा.</p>
+
+    <p class="muted" style="margin-top:12px">Auto-save enabled — images stored as Base64 in localStorage (recommended: small JPGs).</p>
   </div>
 </div>
 
 <script>
-/* ---------- State & AutoSave ---------- */
+/* ================= State & AutoSave ================= */
+const STORAGE_KEY = "mcq_with_images_v1";
 let questions = [];
 let qno = 1;
-const STORAGE_KEY = "mcq_final_store_v1";
 
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const obj = JSON.parse(raw);
-      if(Array.isArray(obj.questions)) { questions = obj.questions; qno = obj.qno || (questions.length+1); renderPreview(); }
+      if(Array.isArray(obj.questions)){
+        questions = obj.questions; qno = obj.qno || (questions.length+1);
+        renderPreview();
+      }
     }
-  }catch(e){ console.warn("loadState error",e); }
+  }catch(e){ console.warn("loadState err", e); }
 }
-function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify({questions,qno})); }
+function saveState(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({questions,qno})); }catch(e){ console.warn("saveState err", e); } }
 
-/* ---------- Helpers ---------- */
 function getVal(id){ return document.getElementById(id).value.trim(); }
 function setVal(id,v){ document.getElementById(id).value = v || ""; }
 function isHindiText(s){ if(!s) return false; return /[\u0900-\u097F]/.test(s); }
 
-/* ---------- Add / UI ---------- */
-document.getElementById('addBtn').addEventListener('click', ()=>{
+/* ================= File → DataURL helper ================= */
+function fileToDataURL(inputEl){
+  return new Promise((resolve)=>{
+    const f = inputEl.files && inputEl.files[0];
+    if(!f) return resolve(null);
+    const reader = new FileReader();
+    reader.onload = ()=> resolve({name: f.name, type: f.type, dataURL: reader.result});
+    reader.readAsDataURL(f);
+  });
+}
+
+/* ================= Add Question ================= */
+document.getElementById('addBtn').addEventListener('click', async ()=>{
   const question = getVal('question');
   if(!question){ alert('Question डालो।'); return; }
 
-  // determine language: user select overrides auto-detect
+  // language selection / auto-detect
   let lang = getVal('language');
   if(!lang){
-    // auto-detect: if any option or question has devanagari => hi
-    if(isHindiText(question) || isHindiText(getVal('optA')) || isHindiText(getVal('optB')) || isHindiText(getVal('optC')) || isHindiText(getVal('optD')) || isHindiText(getVal('solution'))){
-      lang = "hi";
-    } else lang = "en";
+    if(isHindiText(question) || isHindiText(getVal('optA')) || isHindiText(getVal('optB')) || isHindiText(getVal('optC')) || isHindiText(getVal('optD')) || isHindiText(getVal('solution'))) lang = "hi";
+    else lang = "en";
   }
+
+  // read image inputs as dataURL (base64)
+  const moduleImg = await fileToDataURL(document.getElementById('moduleImg'));
+  const questionImg = await fileToDataURL(document.getElementById('questionImg'));
+  const optAImg = await fileToDataURL(document.getElementById('optAImg'));
+  const optBImg = await fileToDataURL(document.getElementById('optBImg'));
+  const optCImg = await fileToDataURL(document.getElementById('optCImg'));
+  const optDImg = await fileToDataURL(document.getElementById('optDImg'));
+  const solutionImg = await fileToDataURL(document.getElementById('solutionImg'));
 
   const item = {
     module: getVal('module') || "General",
+    moduleImg, // may be null
     questionno: qno++,
     question,
+    questionImg,
     type: "mcq",
     option: [ getVal('optA'), getVal('optB'), getVal('optC'), getVal('optD') ],
+    optionImg: [ optAImg, optBImg, optCImg, optDImg ],
     answer: getVal('answer'),
     solution: getVal('solution'),
+    solutionImg,
     pm: getVal('pm') || "1",
     nm: getVal('nm') || "0",
     language: lang
   };
+
   questions.push(item);
   saveState();
   renderPreview();
   clearFormFields();
 });
 
+/* ================= Clear / Remove / Reset ================= */
 document.getElementById('clearBtn').addEventListener('click', clearFormFields);
 function clearFormFields(){
   setVal('module',''); setVal('question','');
+  document.getElementById('moduleImg').value = "";
+  document.getElementById('questionImg').value = "";
   setVal('optA',''); setVal('optB',''); setVal('optC',''); setVal('optD','');
-  setVal('answer',''); setVal('solution',''); setVal('pm','1'); setVal('nm','0.6'); document.getElementById('language').value = "";
+  document.getElementById('optAImg').value=""; document.getElementById('optBImg').value=""; document.getElementById('optCImg').value=""; document.getElementById('optDImg').value="";
+  setVal('answer',''); setVal('solution',''); document.getElementById('solutionImg').value="";
+  setVal('pm','1'); setVal('nm','0.6'); document.getElementById('language').value="";
 }
 
-/* ---------- Preview ---------- */
-function renderPreview(){
-  const area = document.getElementById('previewArea');
-  area.innerHTML = "";
-  if(questions.length===0){ area.innerHTML = '<div class="muted">No questions added.</div>'; return; }
-
-  questions.forEach(q=>{
-    const tbl = document.createElement('table');
-    tbl.className = "preview-table";
-    tbl.style.borderCollapse = "collapse";
-
-    function addRow(name,val){
-      const tr = document.createElement('tr');
-      const td1 = document.createElement('td');
-      td1.textContent = name;
-      td1.style.background = "white";
-      td1.style.fontWeight = "600";
-      td1.style.width = "140px";
-      const td2 = document.createElement('td');
-      td2.textContent = val;
-      td2.style.background = "#ffe39c";
-      tr.appendChild(td1); tr.appendChild(td2);
-      tbl.appendChild(tr);
-    }
-
-    addRow("Module", q.module);
-    addRow("questionno", q.questionno);
-    addRow("Question", q.question);
-    addRow("Type", q.type);
-    addRow("option", q.option[0]||"");
-    addRow("option", q.option[1]||"");
-    addRow("option", q.option[2]||"");
-    addRow("option", q.option[3]||"");
-    addRow("answer", q.answer||"");
-    addRow("Solution", q.solution||"");
-    addRow("Positive Marks", q.pm);
-    addRow("Negative Marks", q.nm);
-    addRow("language", q.language||"");
-
-    area.appendChild(tbl);
-  });
-}
-
-/* ---------- Remove / Reset ---------- */
 document.getElementById('removeLast').addEventListener('click', ()=>{
-  if(questions.length===0) return alert("Kuch bhi nahi hai remove karne ke liye");
-  questions.pop();
-  saveState();
-  renderPreview();
+  if(!questions.length) return alert("No questions to remove");
+  questions.pop(); saveState(); renderPreview();
 });
 document.getElementById('resetAll').addEventListener('click', ()=>{
   if(!confirm("सारे questions हटाने हैं?")) return;
   questions=[]; qno=1; saveState(); renderPreview();
 });
 
-/* ---------- JSON Import / Export ---------- */
+/* ================= Preview ================= */
+function renderPreview(){
+  const area = document.getElementById('previewArea');
+  area.innerHTML = "";
+  if(!questions.length){ area.innerHTML = '<div class="muted">No questions added.</div>'; return; }
+
+  questions.forEach((q, idx)=>{
+    const tbl = document.createElement('table');
+    tbl.className = "preview-table";
+
+    function addRow(name, value, imgData){
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td');
+      td1.textContent = name; td1.style.background="white"; td1.style.fontWeight="600"; td1.style.width="140px";
+      const td2 = document.createElement('td'); td2.style.background="#ffe39c";
+      if(value) {
+        const p = document.createElement('div'); p.textContent = value; td2.appendChild(p);
+      }
+      if(imgData && imgData.dataURL){
+        const im = document.createElement('img'); im.src = imgData.dataURL; im.className='img-preview';
+        td2.appendChild(im);
+      }
+      tr.appendChild(td1); tr.appendChild(td2);
+      tbl.appendChild(tr);
+    }
+
+    addRow("Module", q.module, q.moduleImg);
+    addRow("questionno", q.questionno, null);
+    addRow("Question", q.question, q.questionImg);
+    addRow("Type", q.type, null);
+    addRow("option", q.option[0]||"", q.optionImg[0]);
+    addRow("option", q.option[1]||"", q.optionImg[1]);
+    addRow("option", q.option[2]||"", q.optionImg[2]);
+    addRow("option", q.option[3]||"", q.optionImg[3]);
+    addRow("answer", q.answer||"", null);
+    addRow("Solution", q.solution||"", q.solutionImg);
+    addRow("Positive Marks", q.pm||"", null);
+    addRow("Negative Marks", q.nm||"", null);
+    addRow("language", q.language||"", null);
+
+    area.appendChild(tbl);
+  });
+}
+
+/* ================= JSON Import / Export ================= */
 document.getElementById('importJsonBtn').addEventListener('click', ()=>{
   const txt = document.getElementById('jsonArea').value.trim();
-  if(!txt) return alert("JSON paste करो पहले");
+  if(!txt) return alert("Paste JSON first");
   try{
     const arr = JSON.parse(txt);
-    if(!Array.isArray(arr)) return alert("JSON array होना चाहिए");
-    // validate and map minimal fields
+    if(!Array.isArray(arr)) return alert("JSON should be array");
     arr.forEach(it=>{
+      // convert image fields if they are present as dataURL objects or strings
+      const moduleImg = (it.moduleImg && it.moduleImg.dataURL) ? it.moduleImg : (typeof it.moduleImg === 'string' ? {dataURL: it.moduleImg, name: it.moduleImgName||'img.png', type: it.moduleImgType||'image/png'} : null);
+      const questionImg = (it.questionImg && it.questionImg.dataURL) ? it.questionImg : (typeof it.questionImg === 'string' ? {dataURL: it.questionImg, name: it.questionImgName||'img.png', type: it.questionImgType||'image/png'} : null);
+      const optionImg = [it.optionImg && it.optionImg[0] ? it.optionImg[0] : null, it.optionImg && it.optionImg[1] ? it.optionImg[1] : null, it.optionImg && it.optionImg[2] ? it.optionImg[2] : null, it.optionImg && it.optionImg[3] ? it.optionImg[3] : null];
+      const solutionImg = (it.solutionImg && it.solutionImg.dataURL) ? it.solutionImg : (typeof it.solutionImg === 'string' ? {dataURL: it.solutionImg, name: it.solutionImgName||'img.png', type: it.solutionImgType||'image/png'} : null);
+
       const item = {
         module: it.module || "General",
+        moduleImg,
         questionno: qno++,
         question: it.question || "",
+        questionImg,
         type: "mcq",
         option: Array.isArray(it.option) ? it.option.concat([]).slice(0,4) : [it.optA||"",it.optB||"",it.optC||"",it.optD||""],
+        optionImg,
         answer: it.answer || "",
         solution: it.solution || "",
-        pm: (it.pm!=null) ? String(it.pm) : "1",
-        nm: (it.nm!=null) ? String(it.nm) : "0",
-        language: it.language || (isHindiText(it.question || "") ? "hi" : "en")
+        solutionImg,
+        pm: it.pm != null ? String(it.pm) : "1",
+        nm: it.nm != null ? String(it.nm) : "0",
+        language: it.language || (isHindiText(it.question||"") ? "hi" : "en")
       };
       questions.push(item);
     });
-    saveState();
-    renderPreview();
-    alert("Imported " + arr.length + " questions");
+    saveState(); renderPreview(); alert("Imported " + arr.length + " questions");
   }catch(e){ alert("Invalid JSON: " + e.message); }
 });
 
-document.getElementById('clearJsonBtn').addEventListener('click', ()=> { document.getElementById('jsonArea').value = ""; });
-
+document.getElementById('clearJsonBtn').addEventListener('click', ()=> document.getElementById('jsonArea').value = '');
 document.getElementById('saveJSONBtn').addEventListener('click', ()=>{
-  if(questions.length===0) return alert("Koi question nhi hai export karne ke liye");
+  if(questions.length===0) return alert("No questions");
   const data = JSON.stringify(questions, null, 2);
-  const blob = new Blob([data],{type:"application/json"});
+  const blob = new Blob([data], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = "mcq_export.json"; a.click();
   setTimeout(()=> URL.revokeObjectURL(url),3000);
 });
-
-document.getElementById('downloadJsonBtn').addEventListener('click', ()=>{
+document.getElementById('downloadJsonBtn').addEventListener('click', ()=> {
   if(questions.length===0) return alert("No questions");
-  const data = JSON.stringify(questions, null, 2);
-  const blob = new Blob([data],{type:"application/json"});
+  const blob = new Blob([JSON.stringify(questions, null, 2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = "mcq_bank.json"; a.click();
   setTimeout(()=> URL.revokeObjectURL(url),3000);
 });
 
-/* ---------- DOCX Builder Helpers ---------- */
-function xmlEscape(s){
-  if(s==null) return "";
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-}
+/* ================= DOCX XML helpers (images embed) ================= */
+function xmlEscape(s){ if(s==null) return ""; return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-// font run for Kruti Dev if needed
+// Kruti Dev run if Hindi
 function fontRunIfHindi(lang, text){
-  // lang param from question; also detect if text has hindi
   const needs = (lang==="hi") || isHindiText(text);
   if(!needs) return "";
-  // using common Kruti Dev font name
   return `<w:rPr><w:rFonts w:ascii="Kruti Dev 010" w:hAnsi="Kruti Dev 010" w:cs="Kruti Dev 010"/></w:rPr>`;
 }
 
-function makeRowXml(name, value, lang){
+// Each embedded image will be assigned a media name: image1.png, image2.jpg, ...
+// We'll collect all images from all questions in order and create rels + media files
+function collectImages(){
+  const imgs = [];
+  questions.forEach((q, qi)=>{
+    // moduleImg
+    if(q.moduleImg && q.moduleImg.dataURL) imgs.push({qIndex:qi, field:'moduleImg', data:q.moduleImg});
+    // questionImg
+    if(q.questionImg && q.questionImg.dataURL) imgs.push({qIndex:qi, field:'questionImg', data:q.questionImg});
+    // option images
+    q.optionImg && q.optionImg.forEach((oi, idx)=>{
+      if(oi && oi.dataURL) imgs.push({qIndex:qi, field:'optionImg'+idx, optIndex:idx, data:oi});
+    });
+    // solution
+    if(q.solutionImg && q.solutionImg.dataURL) imgs.push({qIndex:qi, field:'solutionImg', data:q.solutionImg});
+  });
+  return imgs;
+}
+
+// build a drawing xml snippet referencing rId
+function makeImageDrawingXml(rId, cxEMU, cyEMU){
+  // use simple inline drawing; Word accepts this
+  return `
+<w:r>
+  <w:rPr/>
+  <w:drawing>
+    <wp:inline xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
+      <wp:extent cx="${cxEMU}" cy="${cyEMU}"/>
+      <wp:docPr id="1" name="Image"/>
+      <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+          <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:nvPicPr>
+              <pic:cNvPr id="0" name="Image"/>
+              <pic:cNvPicPr/>
+            </pic:nvPicPr>
+            <pic:blipFill>
+              <a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="${rId}"/>
+              <a:stretch><a:fillRect/></a:stretch>
+            </pic:blipFill>
+            <pic:spPr>
+              <a:xfrm><a:off x="0" y="0"/><a:ext cx="${cxEMU}" cy="${cyEMU}"/></a:xfrm>
+              <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            </pic:spPr>
+          </pic:pic>
+        </a:graphicData>
+      </a:graphic>
+    </wp:inline>
+  </w:drawing>
+</w:r>`;
+}
+
+// Make table row xml — if image present will include image drawing below text
+function makeRowXml(name, value, imgRelId, imgCX, imgCY, lang){
   const fontTag = fontRunIfHindi(lang, value);
+  let imgPart = "";
+  if(imgRelId){
+    imgPart = makeImageDrawingXml(imgRelId, imgCX, imgCY);
+  }
   return `
 <w:tr>
   <w:tc>
@@ -290,25 +379,29 @@ function makeRowXml(name, value, lang){
       <w:top w:val="single"/><w:left w:val="single"/><w:bottom w:val="single"/><w:right w:val="single"/>
     </w:tcBorders></w:tcPr>
     <w:p><w:r>${fontTag}<w:t>${xmlEscape(value)}</w:t></w:r></w:p>
+    ${imgPart}
   </w:tc>
 </w:tr>`;
 }
 
-function buildQuestionTableXml(q){
+// Build question table, mapping imagesRelMap for this question's images (field->rId)
+function buildQuestionTableXml(q, imagesRelMap){
   let rows = "";
-  rows += makeRowXml("Module", q.module, q.language);
-  rows += makeRowXml("questionno", q.questionno, q.language);
-  rows += makeRowXml("Question", q.question, q.language);
-  rows += makeRowXml("Type", q.type, q.language);
-  rows += makeRowXml("option", q.option[0] || "", q.language);
-  rows += makeRowXml("option", q.option[1] || "", q.language);
-  rows += makeRowXml("option", q.option[2] || "", q.language);
-  rows += makeRowXml("option", q.option[3] || "", q.language);
-  rows += makeRowXml("answer", q.answer || "", q.language);
-  rows += makeRowXml("Solution", q.solution || "", q.language);
-  rows += makeRowXml("Positive Marks", q.pm || "", q.language);
-  rows += makeRowXml("Negative Marks", q.nm || "", q.language);
-  rows += makeRowXml("language", q.language || "", q.language);
+  rows += makeRowXml("Module", q.module || "", imagesRelMap.moduleImg, imagesRelMap.moduleCx, imagesRelMap.moduleCy, q.language);
+  rows += makeRowXml("questionno", String(q.questionno), null,0,0,q.language);
+  rows += makeRowXml("Question", q.question || "", imagesRelMap.questionImg, imagesRelMap.questionCx, imagesRelMap.questionCy, q.language);
+  rows += makeRowXml("Type", q.type || "", null,0,0,q.language);
+  // options
+  for(let i=0;i<4;i++){
+    const field = "option"+i;
+    const val = q.option && q.option[i] ? q.option[i] : "";
+    rows += makeRowXml("option", val, imagesRelMap[field], imagesRelMap[field+"Cx"], imagesRelMap[field+"Cy"], q.language);
+  }
+  rows += makeRowXml("answer", q.answer || "", null,0,0,q.language);
+  rows += makeRowXml("Solution", q.solution || "", imagesRelMap.solutionImg, imagesRelMap.solutionCx, imagesRelMap.solutionCy, q.language);
+  rows += makeRowXml("Positive Marks", q.pm || "", null,0,0,q.language);
+  rows += makeRowXml("Negative Marks", q.nm || "", null,0,0,q.language);
+  rows += makeRowXml("language", q.language || "", null,0,0,q.language);
 
   return `<w:tbl>
   <w:tblPr><w:tblBorders>
@@ -319,30 +412,171 @@ function buildQuestionTableXml(q){
 </w:tbl>`;
 }
 
-function buildDocumentXml(){
+/* ================ Build full document.xml + images package ================ */
+function buildDocumentPackage(){
+  // collect images in order and assign media names and rel ids
+  const imgs = collectImages(); // returns array {qIndex, field, optIndex?, data}
+  const mediaFiles = []; // {name, type, dataUint8}
+  const imageRelIds = []; // map index -> rId
+
+  // create media entries
+  imgs.forEach((it, idx)=>{
+    const d = it.data; // {name,type,dataURL}
+    // dataURL -> binary
+    const comma = d.dataURL.indexOf(',');
+    const meta = d.dataURL.slice(0, comma); // e.g., data:image/png;base64
+    const b64 = d.dataURL.slice(comma+1);
+    const binStr = atob(b64);
+    const u8 = new Uint8Array(binStr.length);
+    for(let i=0;i<binStr.length;i++) u8[i] = binStr.charCodeAt(i);
+    // choose extension
+    let ext = "png";
+    if(d.type && d.type.indexOf("jpeg")!==-1) ext = "jpg";
+    else if(d.type && d.type.indexOf("png")!==-1) ext = "png";
+    else if(d.name){
+      const m = d.name.match(/\.(png|jpe?g|gif|bmp)$/i);
+      if(m) ext = m[1].toLowerCase();
+    }
+    const name = `image${idx+1}.${ext}`;
+    mediaFiles.push({name, type: d.type || ('image/'+ext), data: u8, original: d, ref: it});
+    imageRelIds.push("rIdImg" + (idx+1));
+  });
+
+  // Build document.xml, but we need to map which image (if any) belongs to which question field
+  // Create a map questionIndex -> {moduleImg: rId or null, questionImg: rId,...} and CX/CY sizes
+  const imagesRelMapPerQuestion = questions.map(()=>({
+    moduleImg:null, moduleCx:0,moduleCy:0,
+    questionImg:null, questionCx:0,questionCy:0,
+    option0:null, option0Cx:0, option0Cy:0,
+    option1:null, option1Cx:0, option1Cy:0,
+    option2:null, option2Cx:0, option2Cy:0,
+    option3:null, option3Cx:0, option3Cy:0,
+    solutionImg:null, solutionCx:0, solutionCy:0
+  }));
+
+  // assign rIds to fields by iterating imgs
+  imgs.forEach((it, idx)=>{
+    const qmap = imagesRelMapPerQuestion[it.qIndex];
+    const rId = imageRelIds[idx];
+    // estimate size in EMU: convert px width to EMU (1px ~ 9525 EMU). We'll use width ~ 450px for full width.
+    // But to keep consistent, use width 450px -> cx = 450*9525 ~ 4286250
+    const defaultCx = 450 * 9525; // ~4.29M EMU
+    const defaultCy = 250 * 9525; // ~2.38M EMU
+    if(it.field === 'moduleImg'){ qmap.moduleImg = rId; qmap.moduleCx = defaultCx; qmap.moduleCy = defaultCy; }
+    else if(it.field === 'questionImg'){ qmap.questionImg = rId; qmap.questionCx = defaultCx; qmap.questionCy = defaultCy; }
+    else if(it.field.startsWith('optionImg')){ const n = Number(it.field.replace('optionImg','')); const fld = 'option'+n; qmap[fld] = rId; qmap[fld+'Cx'] = 350*9525; qmap[fld+'Cy'] = 200*9525; }
+    else if(it.field === 'solutionImg'){ qmap.solutionImg = rId; qmap.solutionCx = defaultCx; qmap.solutionCy = defaultCy; }
+  });
+
+  // Build document.xml body by concatenating question tables using imagesRelMapPerQuestion
   let body = "";
-  questions.forEach(q => body += buildQuestionTableXml(q));
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  questions.forEach((q, qi)=>{
+    const map = imagesRelMapPerQuestion[qi];
+    body += buildQuestionTableXml(q, map);
+  });
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+            xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+            xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+            xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   <w:body>
     ${body}
     <w:p/><w:sectPr/>
   </w:body>
 </w:document>`;
+
+  // Build relationships for images: document.xml.rels
+  let rels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">`;
+  mediaFiles.forEach((m, i)=>{
+    const rId = imageRelIds[i];
+    rels += `\n  <Relationship Id="${rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${m.name}"/>`;
+  });
+  rels += `\n</Relationships>`;
+
+  // content types: include image types dynamically
+  const defaults = [`  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>`,
+                    `  <Default Extension="xml" ContentType="application/xml"/>`,
+                    `  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>`];
+
+  // media overrides
+  const mediaOverrides = mediaFiles.map(m=>{
+    // pick content type; if unknown fallback to image/png
+    const ctype = m.type || (m.name.endsWith('.jpg')? 'image/jpeg' : (m.name.endsWith('.png')? 'image/png' : 'image/png'));
+    return `  <Default Extension="${m.name.split('.').pop()}" ContentType="${ctype}"/>`;
+  });
+
+  // but Default for extensions must be unique; we'll build unique set
+  const extSet = {};
+  mediaFiles.forEach(m => extSet[m.name.split('.').pop()] = m.type || 'image/png');
+  let ctXml = `<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n`;
+  ctXml += `  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n`;
+  ctXml += `  <Default Extension="xml" ContentType="application/xml"/>\n`;
+  ctXml += `  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>\n`;
+  Object.keys(extSet).forEach(ext => {
+    ctXml += `  <Default Extension="${ext}" ContentType="${extSet[ext]}"/>\n`;
+  });
+  ctXml += `</Types>`;
+
+  // package files: _rels/.rels (empty) and word/_rels/document.xml.rels with rels, word/document.xml, and media files under word/media/
+  const relsRels = `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+  // Create files object: keys -> content (string or Uint8Array for images)
+  const files = {};
+  files["[Content_Types].xml"] = ctXml;
+  files["_rels/.rels"] = relsRels;
+  files["word/document.xml"] = documentXml;
+  files["word/_rels/document.xml.rels"] = rels;
+
+  // add media files as binary Uint8Array
+  mediaFiles.forEach(m=>{
+    files[`word/media/${m.name}`] = m.data; // Uint8Array
+  });
+
+  return files;
 }
 
-/* ---------- Stable ZIP builder (correct offsets) ---------- */
-function buildZipBlob(files){
-  function s2u(s){ return new TextEncoder().encode(s); }
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
+/* ================= ZIP builder that handles binary parts ================= */
+function buildZipBlobFromFiles(files){
+  // files: {path: string -> data: string OR Uint8Array}
+  function toUint8Array(obj){
+    if(typeof obj === 'string') return new TextEncoder().encode(obj);
+    if(obj instanceof Uint8Array) return obj;
+    if(obj instanceof ArrayBuffer) return new Uint8Array(obj);
+    throw new Error("Unsupported file data type");
+  }
 
+  function uint32LE(n){ return [n & 0xff, (n>>8)&0xff, (n>>16)&0xff, (n>>24)&0xff]; }
+
+  // CRC table
+  const crcTable = (function(){
+    let c; const table = new Uint32Array(256);
+    for(let n=0;n<256;n++){
+      c = n;
+      for(let k=0;k<8;k++){ c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); }
+      table[n] = c >>> 0;
+    }
+    return table;
+  })();
+  function crc32(buf){
+    let crc = 0 ^ (-1);
+    for(let i=0;i<buf.length;i++) crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xff];
+    return (crc ^ (-1)) >>> 0;
+  }
+
+  const localParts = []; const centralParts = [];
+  let offset = 0;
   for(const name in files){
-    const content = files[name];
-    const data = s2u(content);
-    const fname = s2u(name);
-    const size = data.length;
+    const contentRaw = files[name];
+    const data = toUint8Array(contentRaw);
+    const fname = new TextEncoder().encode(name);
+    const crc = crc32(data);
+    const compSize = data.length, uncompSize = data.length;
 
     // local header
     const lh = new Uint8Array(30 + fname.length);
@@ -350,13 +584,12 @@ function buildZipBlob(files){
     lh.set([20,0],4);
     lh.set([0,0],6);
     lh.set([0,0],8);
-    lh.set([0,0,0,0],10); // mod time/date
-    lh.set([0,0,0,0],14); // crc placeholder (0)
-    lh.set([size & 0xff, (size>>8)&0xff, (size>>16)&0xff, (size>>24)&0xff],18);
-    lh.set([size & 0xff, (size>>8)&0xff, (size>>16)&0xff, (size>>24)&0xff],22);
+    lh.set([0,0,0,0],10);
+    lh.set(uint32LE(crc),14);
+    lh.set(uint32LE(compSize),18);
+    lh.set(uint32LE(uncompSize),22);
     lh.set([fname.length & 0xff, (fname.length>>8)&0xff],26);
     lh.set(fname,30);
-
     localParts.push({lh,data});
     offset += lh.length + data.length;
 
@@ -366,24 +599,21 @@ function buildZipBlob(files){
     ch.set([20,0],4); ch.set([20,0],6);
     ch.set([0,0],8); ch.set([0,0],10);
     ch.set([0,0,0,0],12);
-    ch.set([0,0,0,0],16); // crc placeholder
-    ch.set([size & 0xff, (size>>8)&0xff, (size>>16)&0xff, (size>>24)&0xff],20);
-    ch.set([size & 0xff, (size>>8)&0xff, (size>>16)&0xff, (size>>24)&0xff],24);
+    ch.set(uint32LE(crc),16);
+    ch.set(uint32LE(compSize),20);
+    ch.set(uint32LE(uncompSize),24);
     ch.set([fname.length & 0xff, (fname.length>>8)&0xff],28);
-    ch.set([0,0,0,0],30);
-    ch.set([0,0],36);
-    ch.set([0,0,0,0],38);
-    // set offset to the start of local header for this file:
+    ch.set([0,0,0,0],30); ch.set([0,0,0,0],32);
+    ch.set([0,0],36); ch.set([0,0,0,0],38);
     const localStart = offset - (lh.length + data.length);
-    ch.set([localStart & 0xff, (localStart>>8)&0xff, (localStart>>16)&0xff, (localStart>>24)&0xff],42);
+    ch.set(uint32LE(localStart),42);
     ch.set(fname,46);
     centralParts.push(ch);
   }
 
-  // assemble
-  let totalLocal = 0;
-  localParts.forEach(it => totalLocal += it.lh.length + it.data.length);
-  let centralSize = 0; centralParts.forEach(c => centralSize += c.length);
+  // assemble final Uint8Array
+  let totalLocal = 0; localParts.forEach(it=> totalLocal += it.lh.length + it.data.length);
+  let centralSize = 0; centralParts.forEach(c=> centralSize += c.length);
   const eocdSize = 22;
   const out = new Uint8Array(totalLocal + centralSize + eocdSize);
   let p = 0;
@@ -391,7 +621,6 @@ function buildZipBlob(files){
   const cdStart = p;
   centralParts.forEach(c => { out.set(c, p); p += c.length; });
   const cdSize = p - cdStart;
-
   // EOCD
   out.set([0x50,0x4b,0x05,0x06], p); p+=4;
   out.set([0,0], p); p+=2;
@@ -403,34 +632,21 @@ function buildZipBlob(files){
   out.set([ cdStart & 0xff, (cdStart>>8)&0xff, (cdStart>>16)&0xff, (cdStart>>24)&0xff ], p); p+=4;
   out.set([0,0], p); p+=2;
 
-  return new Blob([out], {type:"application/zip"});
+  return new Blob([out], {type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
 }
 
-/* ---------- DOCX Export ---------- */
+/* ================= Export DOCX: build package and download as question.docx ================= */
 document.getElementById('exportBtn').addEventListener('click', ()=>{
-  if(questions.length===0) return alert("पहले प्रश्न जोड़ो!");
-  const docXml = buildDocumentXml();
-  const files = {
-    "[Content_Types].xml": `<?xml version="1.0" encoding="UTF-8"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-</Types>`,
-    "_rels/.rels": `<?xml version="1.0"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>`,
-    "word/_rels/document.xml.rels": `<?xml version="1.0"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>`,
-    "word/document.xml": docXml
-  };
-
-  const zipBlob = buildZipBlob(files);
-  const url = URL.createObjectURL(zipBlob);
-  const a = document.createElement('a'); a.href = url; a.download = "mcq_export.docx"; a.click();
-  setTimeout(()=> URL.revokeObjectURL(url),3000);
+  if(questions.length===0){ alert("पहले कम से कम एक प्रश्न जोड़ो"); return; }
+  // build files with images
+  const files = buildDocumentPackage();
+  const blob = buildZipBlobFromFiles(files);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = "question.docx"; a.click();
+  setTimeout(()=> URL.revokeObjectURL(url), 4000);
 });
 
-/* ---------- Init ---------- */
+/* ================= Init ================= */
 loadState();
 </script>
 </body>
